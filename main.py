@@ -1,5 +1,3 @@
-from sitecustomize import new_prefix
-
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
