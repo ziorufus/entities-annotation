@@ -25,6 +25,25 @@ Base.metadata.create_all(bind=engine)
 # --- FastAPI app ---
 app = FastAPI(title="Geographical Entities API")
 
+class ForwardedPrefixMiddleware:
+    """
+    Middleware that sets the ASGI 'root_path' based on the
+    'X-Forwarded-Prefix' header sent by a reverse proxy (e.g. Apache).
+    Works with any FastAPI/Starlette version.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            for key, value in scope.get("headers", []):
+                if key.decode().lower() == "x-forwarded-prefix":
+                    scope["root_path"] = value.decode()
+                    break
+        await self.app(scope, receive, send)
+
+app.add_middleware(ForwardedPrefixMiddleware)
+
 def smart_split(line: str) -> list[str]:
     """
     Split a line by commas that are not inside parentheses.
