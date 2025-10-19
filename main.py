@@ -15,7 +15,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    sys.exit("❌ Error: DB_FILENAME not set in .env file. Please define it before running the app.")
+    sys.exit("❌ Error: DATABASE_URL not set in .env file. Please define it before running the app.")
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
