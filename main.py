@@ -7,6 +7,7 @@ import pandas as pd
 import json
 import os
 import sys
+import googlemaps
 
 from models import Location, Base
 from schemas import UpdateInfoRequest, UpdateGroupRequest
@@ -105,6 +106,63 @@ def update_total_citations(db, group_id: int):
 
 
 # --- Routes ---
+
+@app.get("/geocode/{id}")
+def geocode_id(id: int):
+    """
+    Given a location ID, use Google Maps Geocoding API to return possible matches.
+    If already cached in DB (geolocation field), return the stored result instead.
+    """
+    db = SessionLocal()
+    location = db.query(Location).filter(Location.id == id).first()
+
+    if not location:
+        db.close()
+        raise HTTPException(status_code=404, detail=f"Location with ID {id} not found")
+
+    # ✅ Step 1: check if already cached
+    if location.geolocation:
+        cached = json.loads(location.geolocation)
+        db.close()
+        return {"status": "cached", "id": id, "query": f"{location.name} ({location.type})", "results": cached}
+
+    # ✅ Step 2: not cached → call Google Maps
+    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+    if not api_key:
+        db.close()
+        raise HTTPException(status_code=500, detail="GOOGLE_MAPS_API_KEY not set in .env")
+
+    try:
+        gmaps = googlemaps.Client(key=api_key)
+        query = f"{location.name} ({location.type})" if location.type else location.name
+        results = gmaps.geocode(query)
+
+        if not results:
+            db.close()
+            return {"status": "no_results", "query": query}
+
+        # Simplify the response before saving
+        simplified = [
+            {
+                "formatted_address": r.get("formatted_address"),
+                "place_id": r.get("place_id"),
+                "types": r.get("types"),
+                "geometry": r.get("geometry"),
+            }
+            for r in results
+        ]
+
+        # ✅ Step 3: save results as JSON text in DB
+        location.geolocation = json.dumps(simplified)
+        db.commit()
+        db.close()
+
+        return {"status": "fresh", "id": id, "query": query, "results": simplified}
+
+    except Exception as e:
+        db.rollback()
+        db.close()
+        raise HTTPException(status_code=500, detail=f"Geocoding failed: {str(e)}")
 
 @app.get("/location-list")
 def get_locations():

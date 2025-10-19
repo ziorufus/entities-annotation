@@ -13,6 +13,7 @@ class Location(Base):
     total_citations = Column(Integer, default=0)
     group = Column(Integer, nullable=True)
     location_info = Column(Text, nullable=True, default=None)
+    geolocation = Column(Text, nullable=True, default=None)
 
     __table_args__ = (
         UniqueConstraint("name", "type", name="_name_type_uc"),
